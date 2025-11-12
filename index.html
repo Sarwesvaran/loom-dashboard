@@ -1,0 +1,1844 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loom Monitoring Dashboard</title>
+    <style>
+        /* --- General & Variables --- */
+        :root {
+            --bg-color: #f4f7fa;
+            --card-bg: #ffffff;
+            --header-bg: #ffffff;
+            --text-primary: #1a202c;
+            --text-secondary: #5a677b;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+
+            /* Status Colors */
+            --green: #28a745;
+            --green-bg: #eaf7ec;
+            --yellow: #ffc107;
+            --yellow-bg: #fff9e6;
+            --orange: #fd7e14;
+            --orange-bg: #fff2e7;
+            --red: #dc3545;
+            --red-bg: #fbebed;
+
+            --blue: #007bff;
+
+            /* Efficiency Text Colors */
+            --eff-text-green: #28a745;
+            --eff-text-yellow: #b98900;
+            --eff-text-orange: #fd7e14;
+            --eff-text-red: #dc3545;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+        }
+
+        /* --- Header --- */
+        header {
+            background-color: var(--header-bg);
+            padding: 16px 40px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.5em;
+            color: var(--text-primary);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .unit-toggle {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 0.9em;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .unit-toggle:hover {
+            background-color: var(--bg-color);
+            border-color: #cdd5df;
+        }
+
+        #lastUpdatedTime {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+        }
+
+        /* --- Dashboard Grid --- */
+        .dashboard-grid {
+            padding: 32px 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        /* --- Summary Machine Card --- */
+        .machine-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        .machine-card:hover {
+            box-shadow: 0 8px 12px -2px rgba(0, 0, 0, 0.07), 0 4px 8px -2px rgba(0, 0, 0, 0.05);
+            transform: translateY(-3px);
+        }
+
+        /* Efficiency Color Border */
+        .status-green {
+            border-left: 5px solid var(--green);
+        }
+
+        .status-yellow {
+            border-left: 5px solid var(--yellow);
+        }
+
+        .status-orange {
+            border-left: 5px solid var(--orange);
+        }
+
+        .status-red {
+            border-left: 5px solid var(--red);
+        }
+
+        .status-loading {
+            border-left: 5px solid var(--border-color);
+        }
+
+        .card-tile-header {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-title-group h2 {
+            margin: 0;
+            font-size: 1.25em;
+        }
+
+        .header-title-group span {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .settings-button {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            line-height: 34px;
+            text-align: center;
+        }
+
+        .settings-button:hover {
+            color: var(--blue);
+            border-color: var(--blue);
+        }
+
+        .card-tile-body {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .card-tile-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .stat-line {
+            font-size: 1em;
+            color: var(--text-secondary);
+        }
+
+        .stat-line strong {
+            font-size: 1.2em;
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-right: 4px;
+        }
+
+        /* NEW: State line styling */
+        .tile-state-line {
+            font-size: 1.1em;
+            font-weight: 700;
+            margin-bottom: 8px;
+            /* Add some space below it */
+        }
+
+        .card-tile-efficiency {
+            font-size: 2.8em;
+            font-weight: 700;
+            padding-left: 20px;
+            border-left: 1px solid var(--border-color);
+        }
+
+        /* Efficiency Text Colors */
+        .eff-text-green {
+            color: var(--eff-text-green);
+        }
+
+        .eff-text-yellow {
+            color: var(--eff-text-yellow);
+        }
+
+        .eff-text-orange {
+            color: var(--eff-text-orange);
+        }
+
+        .eff-text-red {
+            color: var(--eff-text-red);
+        }
+
+
+        /* --- Modals (Settings & Details) --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            margin: 8% auto;
+            padding: 0;
+            border: 1px solid var(--border-color);
+            width: 90%;
+            max-width: 600px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.4em;
+        }
+
+        .close-button {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close-button:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Styles for Modal Content */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .stat-item {
+            padding: 12px;
+            background: var(--bg-color);
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .indicator {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .indicator-running {
+            background-color: var(--green-bg);
+            color: var(--green);
+        }
+
+        .indicator-stopped {
+            background-color: var(--red-bg);
+            color: var(--red);
+        }
+
+        .indicator-warp {
+            background-color: var(--red-bg);
+            color: var(--red);
+        }
+
+        .indicator-fill {
+            background-color: var(--orange-bg);
+            color: var(--orange);
+        }
+
+        .indicator-other {
+            background-color: var(--yellow-bg);
+            color: #b98900;
+        }
+
+        .target-info {
+            padding: 12px;
+            background: #e6f2ff;
+            border-radius: 8px;
+            font-size: 0.9em;
+            border-left: 4px solid var(--blue);
+        }
+
+        .target-info .stat-label {
+            color: #004a99;
+        }
+
+        .target-info .stat-value {
+            color: #0056b3;
+        }
+
+        /* Modal-specific for settings */
+        .modal-content label {
+            display: block;
+            margin-top: 16px;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .modal-content input {
+            width: 95%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-size: 1em;
+        }
+
+        .modal-actions {
+            margin-top: 24px;
+            text-align: right;
+            padding: 16px 24px;
+            background-color: var(--bg-color);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .modal-actions button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+
+        #saveSettingsBtn {
+            background-color: var(--blue);
+            color: white;
+            margin-left: 10px;
+        }
+
+        #saveSettingsBtn:hover {
+            background-color: #0056b3;
+        }
+
+        #closeModalBtn,
+        #closeDetailsBtn {
+            background-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        #closeModalBtn:hover,
+        #closeDetailsBtn:hover {
+            background-color: #cdd5df;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>🏭 Loom Monitoring Dashboard</h1>
+        <div class="controls">
+            <button class="unit-toggle" id="unitToggle">Display in **Meters**</button>
+            <div id="lastUpdatedTime">Updating...</div>
+        </div>
+    </header>
+
+    <div class="dashboard-grid" id="dashboardGrid">
+    </div>
+
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Settings for Machine ID: </h3>
+                <span class="close-button" onclick="closeModal('settingsModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <label for="modalPicks">Design Picks / Inch:</label>
+                <input type="number" id="modalPicks" value="10" min="1">
+
+                <label for="modalTarget">Production Target (Meters):</label>
+                <input type="number" id="modalTarget" value="10000" min="1">
+            </div>
+            <div class="modal-actions">
+                <button id="closeModalBtn" onclick="closeModal('settingsModal')">Cancel</button>
+                <button id="saveSettingsBtn" onclick="saveSettings()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="details-title">Machine ID: --</h3>
+                <span class="close-button" onclick="closeModal('detailsModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="stat-item">
+                    <div class="stat-label">Current Efficiency</div>
+                    <div class="stat-value" id="details-efficiency" style="font-size: 1.5em; font-weight: 700;">--%
+                    </div>
+                </div>
+
+                <div id="details-stop-indicator">
+                    <span class="indicator">Loading status...</span>
+                </div>
+
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Picks Count</div>
+                        <div class="stat-value" id="details-picks">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label" id="details-prod-label">Production (m)</div>
+                        <div class="stat-value" id="details-production">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Shift Time (Total)</div>
+                        <div class="stat-value" id="details-shift-time">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Run Time (Actual)</div>
+                        <div class="stat-value" id="details-run-time">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Total Stops</div>
+                        <div class="stat-value" id="details-total-stops">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Warp / Filling Stops</div>
+                        <div class="stat-value" id="details-stop-counts">-- / --</div>
+                    </div>
+                </div>
+
+                <div class="target-info">
+                    <div class="stat-label">Remaining Shift Time</div>
+                    <strong class="stat-value" id="details-shift-remain">-- hrs</strong>
+                </div>
+                <div class="target-info">
+                    <div class="stat-label" id="details-target-label">Time to Target (10000m)</div>
+                    <strong class="stat-value" id="details-target-time">--</strong>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="closeDetailsBtn" onclick="closeModal('detailsModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // API Keys and Channel IDs
+        const loomData = [
+            { id: 1, channelId: '3155741', apiKey: 'C0QJ8VEOS7SKJECK' },
+            { id: 2, channelId: '3157801', apiKey: 'R7NMDOASD7LHPFSV' }
+        ];
+
+        // Global state
+        let isMeters = true;
+        let activeMachineId = null;
+        const SETTINGS_KEY = 'loomSettings';
+        const PICKS_PER_METER = 39.3701;
+
+        let lastReadData = {};
+
+        // --- Settings Management ---
+
+        function loadSettings() {
+            const stored = localStorage.getItem(SETTINGS_KEY);
+            let settings = {};
+            if (stored) {
+                settings = JSON.parse(stored);
+            }
+            loomData.forEach(loom => {
+                if (!settings[loom.id]) {
+                    settings[loom.id] = {
+                        designPicks: 10,
+                        targetMeters: 10000
+                    };
+                }
+            });
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+            return settings;
+        }
+
+        function getMachineSettings(machineId) {
+            const settings = loadSettings();
+            return settings[machineId] || { designPicks: 10, targetMeters: 10000 };
+        }
+
+        function saveMachineSetting(machineId, key, value) {
+            const settings = loadSettings();
+            if (!settings[machineId]) {
+                settings[machineId] = {};
+            }
+            settings[machineId][key] = value;
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        }
+
+        // --- Modal Control ---
+
+        function openSettingsModal(event, machineId) {
+            event.stopPropagation();
+            activeMachineId = machineId;
+            const settings = getMachineSettings(machineId);
+
+            document.getElementById('modalTitle').textContent = `Settings for Machine ID: ${machineId}`;
+            document.getElementById('modalPicks').value = settings.designPicks;
+            document.getElementById('modalTarget').value = settings.targetMeters;
+            document.getElementById('settingsModal').style.display = 'block';
+        }
+
+        function openDetailsModal(machineId) {
+            const data = lastReadData[machineId];
+            if (!data) { return; }
+
+            const settings = getMachineSettings(machineId);
+            const metrics = calculateMetrics(data, settings.designPicks, settings.targetMeters);
+            const unit = isMeters ? 'm' : 'in';
+
+            document.getElementById('details-title').textContent = `Machine ID: ${machineId} (Shift ${data.shift_name})`;
+
+            const effElement = document.getElementById('details-efficiency');
+            effElement.textContent = `${metrics.efficiency}%`;
+            effElement.className = `stat-value ${getEfficiencyColorClass(metrics.efficiency, 'eff-text')}`;
+
+            document.getElementById('details-stop-indicator').innerHTML = getCurrentStopIndicator(data.state, data.current_stop_type);
+
+            document.getElementById('details-picks').textContent = data.picks;
+            document.getElementById('details-prod-label').textContent = `Production (${unit})`;
+            document.getElementById('details-production').textContent = isMeters ? metrics.productionMeters : metrics.productionInches;
+            document.getElementById('details-shift-time').textContent = metrics.shift_time_hm;
+            document.getElementById('details-run-time').textContent = metrics.run_time_hm;
+            document.getElementById('details-total-stops').textContent = metrics.totalStops;
+            document.getElementById('details-stop-counts').textContent = `${data.warp_stop} / ${data.filling_stop}`;
+
+            document.getElementById('details-shift-remain').textContent = `${metrics.remainingShiftHours} hrs`;
+            document.getElementById('details-target-label').textContent = `Time to Target (${metrics.targetMeters}m)`;
+            document.getElementById('details-target-time').textContent = formatTime(metrics.estimatedTimeHours);
+
+            document.getElementById('detailsModal').style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function saveSettings() {
+            const newPicks = parseInt(document.getElementById('modalPicks').value);
+            const newTarget = parseInt(document.getElementById('modalTarget').value);
+
+            if (isNaN(newPicks) || newPicks < 1 || isNaN(newTarget) || newTarget < 1) {
+                alert('Please enter valid, positive numbers for both fields.');
+                return;
+            }
+
+            saveMachineSetting(activeMachineId, 'designPicks', newPicks);
+
+            closeModal('settingsModal');
+            updateDashboard();
+        }
+
+        window.onclick = function (event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        // --- Helper Functions (Time conversion) ---
+
+        function secondsToHm(totalSeconds) {
+            if (isNaN(totalSeconds) || totalSeconds < 0) return '00h 00m';
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const pad = (num) => num.toString().padStart(2, '0');
+            return `${pad(hours)}h ${pad(minutes)}m`;
+        }
+
+        function formatTime(totalHours) {
+            if (totalHours === Infinity) return 'N/A';
+            const totalMinutes = totalHours * 60;
+            const days = Math.floor(totalMinutes / (24 * 60));
+            const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+            const minutes = Math.round(totalMinutes % 60);
+
+            let parts = [];
+            if (days > 0) parts.push(`${days}d`);
+            if (hours > 0) parts.push(`${hours}h`);
+            parts.push(`${minutes}m`);
+
+            return parts.join(' ');
+        }
+
+        // --- ThingSpeak Data Fetching ---
+
+        async function fetchLoomData(channelId, apiKey) {
+            const feedUrl = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=1`;
+            try {
+                const feedResponse = await fetch(feedUrl).then(res => res.json());
+                const latestFeed = feedResponse.feeds[0];
+                if (!latestFeed) { return null; }
+
+                return {
+                    picks: parseInt(latestFeed.field1),
+                    warp_stop: parseInt(latestFeed.field2),
+                    filling_stop: parseInt(latestFeed.field3),
+                    other_stop: parseInt(latestFeed.field4),
+                    shift_sec: parseInt(latestFeed.field5),
+                    run_sec: parseInt(latestFeed.field6),
+                    machine_id: parseInt(latestFeed.field7),
+                    state: parseInt(latestFeed.field8),
+                };
+            } catch (error) {
+                console.error(`Error fetching data for Channel ${channelId}:`, error);
+                return null;
+            }
+        }
+
+        // --- Metric Calculation ---
+
+        function calculateMetrics(data, designPicks, targetMeters) {
+            const { picks, shift_sec, run_sec, warp_stop, filling_stop, other_stop } = data;
+
+            const efficiency = shift_sec > 0 ? (run_sec / shift_sec) * 100 : 0;
+            const productionInches = picks / designPicks;
+            const productionMeters = productionInches / PICKS_PER_METER;
+            const totalStops = warp_stop + filling_stop + other_stop;
+            const totalShiftSeconds = 12 * 3600;
+            const remainingShiftSeconds = totalShiftSeconds - (shift_sec % totalShiftSeconds);
+            const remainingShiftHours = remainingShiftSeconds / 3600;
+
+            let estimatedTimeHours = Infinity;
+            if (productionMeters > 0 && run_sec > 0) {
+                const runHours = run_sec / 3600;
+                const productionRate = productionMeters / runHours;
+                const remainingMeters = targetMeters - productionMeters;
+
+                if (remainingMeters > 0 && productionRate > 0) {
+                    estimatedTimeHours = remainingMeters / productionRate;
+                }
+            }
+
+            return {
+                efficiency: Math.min(efficiency, 100).toFixed(1),
+                productionInches: productionInches.toFixed(2),
+                productionMeters: productionMeters.toFixed(2),
+                totalStops: totalStops,
+                remainingShiftHours: remainingShiftHours.toFixed(2),
+                estimatedTimeHours: estimatedTimeHours,
+                shift_time_hm: secondsToHm(shift_sec),
+                run_time_hm: secondsToHm(run_sec),
+                targetMeters: targetMeters
+            };
+        }
+
+        // --- Status and Rendering ---
+
+        function getEfficiencyColorClass(efficiency, prefix) {
+            const eff = parseFloat(efficiency);
+            if (eff > 80) return `${prefix}-green`;
+            if (eff > 50) return `${prefix}-yellow`;
+            if (eff > 30) return `${prefix}-orange`;
+            return `${prefix}-red`;
+        }
+
+        function getCurrentStopIndicator(state, stopType) {
+            if (state === 1) {
+                return '<span class="indicator indicator-running">Status: RUNNING ✅</span>';
+            }
+            if (stopType === 'Warp') {
+                return '<span class="indicator indicator-warp">STOP: Warp Break 🧵</span>';
+            }
+            if (stopType === 'Filling') {
+                return '<span class="indicator indicator-fill">STOP: Filling Break 🧶</span>';
+            }
+            if (stopType === 'Other') {
+                return '<span class="indicator indicator-other">STOP: Other Issue ⚠️</span>';
+            }
+            return '<span class="indicator indicator-stopped">Status: STOPPED 🛑</span>';
+        }
+
+        // Creates the static card structure once
+        function createCardSkeletons() {
+            const grid = document.getElementById('dashboardGrid');
+            grid.innerHTML = '';
+
+            for (const loom of loomData) {
+                const machineId = loom.id;
+
+                const card = document.createElement('div');
+                card.className = 'machine-card status-loading'; // Default loading state
+                card.id = `machine-card-${machineId}`;
+                card.setAttribute('onclick', `openDetailsModal(${machineId})`);
+
+                // NEW: Updated HTML structure for the summary tile
+                card.innerHTML = `
+                    <div class="card-tile-header">
+                        <div class="header-title-group">
+                            <h2 id="machine-${machineId}-id">Machine ID: ${machineId}</h2>
+                            <span id="machine-${machineId}-shift">Shift: --</span>
+                        </div>
+                        <button class="settings-button" onclick="openSettingsModal(event, ${machineId})">⚙️</button>
+                    </div>
+                    <div class="card-tile-body">
+                        <div class="card-tile-stats">
+                            <div class="stat-line tile-state-line">
+                                <strong id="machine-${machineId}-state">--</strong>
+                            </div>
+                            <div class="stat-line">
+                                <strong><span id="machine-${machineId}-prod">--</span></strong> m
+                            </div>
+                            <div class="stat-line">
+                                <strong><span id="machine-${machineId}-warp">--</span></strong> Warp Stops
+                            </div>
+                            <div class="stat-line">
+                                <strong><span id="machine-${machineId}-fill">--</span></strong> Filling Stops
+                            </div>
+                        </div>
+                        <div class="card-tile-efficiency" id="machine-${machineId}-eff">
+                            --%
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            }
+        }
+
+        // Main update function (updates summary tiles)
+        async function updateDashboard() {
+            const settings = loadSettings();
+            const fetchPromises = loomData.map(loom => fetchLoomData(loom.channelId, loom.apiKey));
+            const results = await Promise.all(fetchPromises);
+
+            const currentReadData = {};
+
+            results.forEach((data, index) => {
+                const loomConfigId = loomData[index].id;
+
+                if (!data || data.machine_id === undefined) {
+                    document.getElementById(`machine-${loomConfigId}-id`).textContent = `Machine ${loomConfigId} (Offline)`;
+                    document.getElementById(`machine-card-${loomConfigId}`).className = 'machine-card status-loading';
+                    return;
+                }
+
+                const machineId = data.machine_id;
+                const machineSettings = getMachineSettings(machineId);
+                const metrics = calculateMetrics(data, machineSettings.designPicks, machineSettings.targetMeters);
+
+                // Stop Logic
+                const lastData = lastReadData[machineId];
+                let stopType = 'None';
+                if (data.state === 0) {
+                    if (lastData && lastData.state === 1) { // Just stopped
+                        if (data.warp_stop > lastData.warp_stop) stopType = 'Warp';
+                        else if (data.filling_stop > lastData.filling_stop) stopType = 'Filling';
+                        else if (data.other_stop > lastData.other_stop) stopType = 'Other';
+                        else stopType = 'Persistent Stop';
+                    } else if (lastData && lastData.state === 0) {
+                        stopType = lastData.current_stop_type; // Carry over
+                    } else {
+                        stopType = 'Persistent Stop';
+                    }
+                }
+                data.current_stop_type = stopType;
+                data.shift_name = data.shift_sec >= 12 * 3600 ? 'B' : 'A'; // Add shift name
+                currentReadData[machineId] = data; // Store full data for modal
+
+                // --- Update Summary Tile ---
+                const card = document.getElementById(`machine-card-${machineId}`);
+                card.className = `machine-card ${getEfficiencyColorClass(metrics.efficiency, 'status')}`;
+
+                // Header
+                document.getElementById(`machine-${machineId}-id`).textContent = `Machine ID: ${machineId}`;
+                document.getElementById(`machine-${machineId}-shift`).textContent = `Shift: ${data.shift_name} (Total ${metrics.shift_time_hm})`;
+
+                // Body Stats
+                // NEW: Update State Element
+                const stateElement = document.getElementById(`machine-${machineId}-state`);
+                if (data.state === 1) {
+                    stateElement.textContent = "Running ✅";
+                    stateElement.style.color = "var(--eff-text-green)";
+                } else {
+                    if (data.current_stop_type === 'Warp') stateElement.textContent = "STOP (Warp) 🛑";
+                    else if (data.current_stop_type === 'Filling') stateElement.textContent = "STOP (Filling) 🟠";
+                    else if (data.current_stop_type === 'Other') stateElement.textContent = "STOP (Other) ⚠️";
+                    else stateElement.textContent = "Stopped 🛑";
+
+                    stateElement.style.color = "var(--eff-text-red)";
+                }
+
+                document.getElementById(`machine-${machineId}-prod`).textContent = metrics.productionMeters;
+                document.getElementById(`machine-${machineId}-warp`).textContent = data.warp_stop;
+                document.getElementById(`machine-${machineId}-fill`).textContent = data.filling_stop;
+
+                // Efficiency
+                const effElement = document.getElementById(`machine-${machineId}-eff`);
+                effElement.textContent = `${metrics.efficiency}%`;
+                effElement.className = `card-tile-efficiency ${getEfficiencyColorClass(metrics.efficiency, 'eff-text')}`;
+            });
+
+            lastReadData = currentReadData; // Update global state
+
+            const now = new Date();
+            document.getElementById('lastUpdatedTime').textContent = `Last Updated: ${now.toLocaleTimeString()}`;
+        }
+
+        function toggleUnit() {
+            isMeters = !isMeters;
+            const button = document.getElementById('unitToggle');
+            button.textContent = isMeters ? 'Display in **Inches**' : 'Display in **Meters**';
+            // Note: This only affects the "Details" modal
+        }
+
+        // --- Initial Load and Interval ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            createCardSkeletons();
+            updateDashboard();
+
+            setInterval(updateDashboard, 15000);
+        });
+    </script>
+</body>
+
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loom Monitoring Dashboard</title>
+    <style>
+        /* --- General & Variables --- */
+        :root {
+            --bg-color: #f4f7fa;
+            --card-bg: #ffffff;
+            --header-bg: #ffffff;
+            --text-primary: #1a202c;
+            --text-secondary: #5a677b;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+
+            /* Status Colors */
+            --green: #28a745;
+            --green-bg: #eaf7ec;
+            --yellow: #ffc107;
+            --yellow-bg: #fff9e6;
+            --orange: #fd7e14;
+            --orange-bg: #fff2e7;
+            --red: #dc3545;
+            --red-bg: #fbebed;
+
+            --blue: #007bff;
+
+            /* Efficiency Text Colors */
+            --eff-text-green: #28a745;
+            --eff-text-yellow: #b98900;
+            --eff-text-orange: #fd7e14;
+            --eff-text-red: #dc3545;
+        }
+
+        /* --- Animations --- */
+        @keyframes pulse-green {
+            0% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+            }
+        }
+
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+            }
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: -1000px 0;
+            }
+
+            100% {
+                background-position: 1000px 0;
+            }
+        }
+
+        body {
+            /* REVERTED FONT */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+        }
+
+        /* --- Header --- */
+        header {
+            background-color: var(--header-bg);
+            padding: 16px 40px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.5em;
+            color: var(--text-primary);
+        }
+
+        #globalShiftInfo {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.1em;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        #lastUpdatedTime {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            text-align: right;
+            min-width: 140px;
+        }
+
+        /* --- Dashboard Grid --- */
+        .dashboard-grid {
+            padding: 32px 24px;
+            display: grid;
+            /* DECREASED WIDTH */
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+        }
+
+        /* --- Summary Machine Card --- */
+        .machine-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        .machine-card:hover {
+            box-shadow: 0 8px 12px -2px rgba(0, 0, 0, 0.07), 0 4px 8px -2px rgba(0, 0, 0, 0.05);
+            transform: translateY(-3px);
+        }
+
+        /* Efficiency Color Border */
+        .status-green {
+            border-left: 5px solid var(--green);
+        }
+
+        .status-yellow {
+            border-left: 5px solid var(--yellow);
+        }
+
+        .status-orange {
+            border-left: 5px solid var(--orange);
+        }
+
+        .status-red {
+            border-left: 5px solid var(--red);
+        }
+
+        .status-loading {
+            border-left: 5px solid var(--border-color);
+            background: linear-gradient(to right, #ffffff 0%, #f4f7fa 50%, #ffffff 100%);
+            background-size: 2000px 100%;
+            animation: shimmer 2s linear infinite;
+        }
+
+        .status-loading .card-tile-body,
+        .status-loading .card-tile-header {
+            opacity: 0.3;
+        }
+
+        .card-tile-header {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-title-group h2 {
+            margin: 0;
+            font-size: 1.25em;
+        }
+
+        .settings-button {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            line-height: 34px;
+            text-align: center;
+        }
+
+        .settings-button:hover {
+            color: var(--blue);
+            border-color: var(--blue);
+        }
+
+        .card-tile-body {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .card-tile-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 60%;
+        }
+
+        .stat-line {
+            font-size: 1em;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .stat-line strong {
+            font-size: 1.2em;
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-right: 4px;
+        }
+
+        .tile-state-line {
+            font-size: 1.1em;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        .live-dot {
+            background-color: var(--green);
+            animation: pulse-green 2s infinite;
+        }
+
+        .stopped-dot {
+            background-color: var(--red);
+            animation: pulse-red 2s infinite;
+        }
+
+        .card-tile-efficiency {
+            /* REVERTED FONT SIZE */
+            font-size: 2.8em;
+            font-weight: 700;
+            padding-left: 20px;
+            border-left: 1px solid var(--border-color);
+            line-height: 1;
+        }
+
+        .eff-text-green {
+            color: var(--eff-text-green);
+        }
+
+        .eff-text-yellow {
+            color: var(--eff-text-yellow);
+        }
+
+        .eff-text-orange {
+            color: var(--eff-text-orange);
+        }
+
+        .eff-text-red {
+            color: var(--eff-text-red);
+        }
+
+        /* --- Modals (Settings & Details) --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            margin: 8% auto;
+            padding: 0;
+            border: 1px solid var(--border-color);
+            width: 90%;
+            max-width: 600px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.4em;
+        }
+
+        .close-button {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close-button:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .stat-item {
+            padding: 12px;
+            background: var(--bg-color);
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .indicator {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .indicator-running {
+            background-color: var(--green-bg);
+            color: var(--green);
+        }
+
+        .indicator-stopped {
+            background-color: var(--red-bg);
+            color: var(--red);
+        }
+
+        .indicator-warp {
+            background-color: var(--red-bg);
+            color: var(--red);
+        }
+
+        .indicator-fill {
+            background-color: var(--orange-bg);
+            color: var(--orange);
+        }
+
+        .indicator-other {
+            background-color: var(--yellow-bg);
+            color: #b98900;
+        }
+
+        .target-info {
+            padding: 12px;
+            background: #e6f2ff;
+            border-radius: 8px;
+            font-size: 0.9em;
+            border-left: 4px solid var(--blue);
+        }
+
+        .target-info .stat-label {
+            color: #004a99;
+        }
+
+        .target-info .stat-value {
+            color: #0056b3;
+        }
+
+        .modal-content label {
+            display: block;
+            margin-top: 16px;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .modal-content input {
+            width: 95%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-size: 1em;
+        }
+
+        .modal-actions {
+            margin-top: 24px;
+            text-align: right;
+            padding: 16px 24px;
+            background-color: var(--bg-color);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .modal-actions button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+
+        #saveSettingsBtn {
+            background-color: var(--blue);
+            color: white;
+            margin-left: 10px;
+        }
+
+        #saveSettingsBtn:hover {
+            background-color: #0056b3;
+        }
+
+        #closeModalBtn,
+        #closeDetailsBtn {
+            background-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        #closeModalBtn:hover,
+        #closeDetailsBtn:hover {
+            background-color: #cdd5df;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Loom Monitoring Dashboard</h1>
+
+        <div id="globalShiftInfo">Loading Shift...</div>
+
+        <div class="controls">
+            <div id="lastUpdatedTime">Updating...</div>
+        </div>
+    </header>
+
+    <div class="dashboard-grid" id="dashboardGrid">
+    </div>
+
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Settings for Machine ID: </h3>
+                <span class="close-button" onclick="closeModal('settingsModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <label for="modalPicks">Design Picks / Inch:</label>
+                <input type="number" id="modalPicks" value="10" min="1">
+                <label for="modalTarget">Production Target (Meters):</label>
+                <input type="number" id="modalTarget" value="10000" min="1">
+            </div>
+            <div class="modal-actions">
+                <button id="closeModalBtn" onclick="closeModal('settingsModal')">Cancel</button>
+                <button id="saveSettingsBtn" onclick="saveSettings()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="details-title">Machine ID: --</h3>
+                <span class="close-button" onclick="closeModal('detailsModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="stat-item">
+                    <div class="stat-label">Current Efficiency</div>
+                    <div class="stat-value" id="details-efficiency" style="font-size: 1.5em; font-weight: 700;">--%
+                    </div>
+                </div>
+                <div id="details-stop-indicator">
+                    <span class="indicator">Loading status...</span>
+                </div>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Picks Count</div>
+                        <div class="stat-value" id="details-picks">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label" id="details-prod-label">Production (m)</div>
+                        <div class="stat-value" id="details-production">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Shift Time (Total)</div>
+                        <div class="stat-value" id="details-shift-time">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Run Time (Actual)</div>
+                        <div class="stat-value" id="details-run-time">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Total Stops</div>
+                        <div class="stat-value" id="details-total-stops">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Warp / Filling Stops</div>
+                        <div class="stat-value" id="details-stop-counts">-- / --</div>
+                    </div>
+                </div>
+                <div class="target-info">
+                    <div class="stat-label">Remaining Shift Time</div>
+                    <strong class="stat-value" id="details-shift-remain">-- hrs</strong>
+                </div>
+                <div class="target-info">
+                    <div class="stat-label" id="details-target-label">Time to Target (10000m)</div>
+                    <strong class="stat-value" id="details-target-time">--</strong>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="closeDetailsBtn" onclick="closeModal('detailsModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Keys and Channel IDs
+        const loomData = [
+            { id: 1, channelId: '3155741', apiKey: 'C0QJ8VEOS7SKJECK' },
+            { id: 2, channelId: '3157801', apiKey: 'R7NMDOASD7LHPFSV' }
+        ];
+
+        // Global state
+        let activeMachineId = null;
+        const SETTINGS_KEY = 'loomSettings';
+        const PICKS_PER_METER = 39.3701;
+
+        let lastReadData = {};
+
+        // --- Settings Management ---
+
+        function loadSettings() {
+            const stored = localStorage.getItem(SETTINGS_KEY);
+            let settings = {};
+            if (stored) {
+                settings = JSON.parse(stored);
+            }
+            loomData.forEach(loom => {
+                if (!settings[loom.id]) {
+                    settings[loom.id] = {
+                        designPicks: 10,
+                        targetMeters: 10000
+                    };
+                }
+            });
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+            return settings;
+        }
+
+        function getMachineSettings(machineId) {
+            const settings = loadSettings();
+            return settings[machineId] || { designPicks: 10, targetMeters: 10000 };
+        }
+
+        function saveMachineSetting(machineId, key, value) {
+            const settings = loadSettings();
+            if (!settings[machineId]) {
+                settings[machineId] = {};
+            }
+            settings[machineId][key] = value;
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        }
+
+        // --- Modal Control ---
+
+        function openSettingsModal(event, machineId) {
+            event.stopPropagation();
+            activeMachineId = machineId;
+            const settings = getMachineSettings(machineId);
+
+            document.getElementById('modalTitle').textContent = `Settings for Machine ID: ${machineId}`;
+            document.getElementById('modalPicks').value = settings.designPicks;
+            document.getElementById('modalTarget').value = settings.targetMeters;
+            document.getElementById('settingsModal').style.display = 'block';
+        }
+
+        function openDetailsModal(machineId) {
+            const data = lastReadData[machineId];
+            if (!data) { return; }
+
+            const settings = getMachineSettings(machineId);
+            const metrics = calculateMetrics(data, settings.designPicks, settings.targetMeters);
+
+            document.getElementById('details-title').textContent = `Machine ID: ${machineId} (Shift ${data.shift_name})`;
+
+            const effElement = document.getElementById('details-efficiency');
+            effElement.textContent = `${metrics.efficiency}%`;
+            effElement.className = `stat-value ${getEfficiencyColorClass(metrics.efficiency, 'eff-text')}`;
+
+            document.getElementById('details-stop-indicator').innerHTML = getCurrentStopIndicator(data.state, data.current_stop_type);
+
+            document.getElementById('details-picks').textContent = data.picks;
+            // ALWAYS METERS
+            document.getElementById('details-prod-label').textContent = `Production (m)`;
+            document.getElementById('details-production').textContent = metrics.productionMeters;
+            document.getElementById('details-shift-time').textContent = metrics.shift_time_hm;
+            document.getElementById('details-run-time').textContent = metrics.run_time_hm;
+            document.getElementById('details-total-stops').textContent = metrics.totalStops;
+            document.getElementById('details-stop-counts').textContent = `${data.warp_stop} / ${data.filling_stop}`;
+
+            document.getElementById('details-shift-remain').textContent = `${metrics.remainingShiftHours} hrs`;
+            document.getElementById('details-target-label').textContent = `Time to Target (${metrics.targetMeters}m)`;
+            document.getElementById('details-target-time').textContent = formatTime(metrics.estimatedTimeHours);
+
+            document.getElementById('detailsModal').style.display = 'block';
+        }
+
+        // REMOVED HISTORY FUNCTIONS
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function saveSettings() {
+            const newPicks = parseInt(document.getElementById('modalPicks').value);
+            const newTarget = parseInt(document.getElementById('modalTarget').value);
+
+            if (isNaN(newPicks) || newPicks < 1 || isNaN(newTarget) || newTarget < 1) {
+                alert('Please enter valid, positive numbers for both fields.');
+                return;
+            }
+
+            saveMachineSetting(activeMachineId, 'designPicks', newPicks);
+
+            closeModal('settingsModal');
+            updateDashboard();
+        }
+
+        window.onclick = function (event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        // --- Helper Functions (Time conversion) ---
+
+        function secondsToHm(totalSeconds) {
+            if (isNaN(totalSeconds) || totalSeconds < 0) return '00h 00m';
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const pad = (num) => num.toString().padStart(2, '0');
+            return `${pad(hours)}h ${pad(minutes)}m`;
+        }
+
+        function formatTime(totalHours) {
+            if (totalHours === Infinity) return 'N/A';
+            const totalMinutes = totalHours * 60;
+            const days = Math.floor(totalMinutes / (24 * 60));
+            const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+            const minutes = Math.round(totalMinutes % 60);
+
+            let parts = [];
+            if (days > 0) parts.push(`${days}d`);
+            if (hours > 0) parts.push(`${hours}h`);
+            parts.push(`${minutes}m`);
+
+            return parts.join(' ');
+        }
+
+        // --- ThingSpeak Data Fetching ---
+
+        async function fetchLoomData(channelId, apiKey) {
+            const feedUrl = `https://api.thingspeak.com/channels/${channelId}/feeds.json?api_key=${apiKey}&results=1`;
+            try {
+                const feedResponse = await fetch(feedUrl).then(res => res.json());
+                const latestFeed = feedResponse.feeds[0];
+                if (!latestFeed) { return null; }
+
+                return {
+                    picks: parseInt(latestFeed.field1),
+                    warp_stop: parseInt(latestFeed.field2),
+                    filling_stop: parseInt(latestFeed.field3),
+                    other_stop: parseInt(latestFeed.field4),
+                    shift_sec: parseInt(latestFeed.field5),
+                    run_sec: parseInt(latestFeed.field6),
+                    machine_id: parseInt(latestFeed.field7),
+                    state: parseInt(latestFeed.field8),
+                };
+            } catch (error) {
+                console.error(`Error fetching data for Channel ${channelId}:`, error);
+                return null;
+            }
+        }
+
+        // --- Metric Calculation ---
+
+        function calculateMetrics(data, designPicks, targetMeters) {
+            const { picks, shift_sec, run_sec, warp_stop, filling_stop, other_stop } = data;
+
+            const efficiency = shift_sec > 0 ? (run_sec / shift_sec) * 100 : 0;
+            const productionInches = picks / designPicks;
+            const productionMeters = productionInches / PICKS_PER_METER;
+            const totalStops = warp_stop + filling_stop + other_stop;
+            const totalShiftSeconds = 12 * 3600;
+            const remainingShiftSeconds = totalShiftSeconds - (shift_sec % totalShiftSeconds);
+            const remainingShiftHours = remainingShiftSeconds / 3600;
+
+            let estimatedTimeHours = Infinity;
+            if (productionMeters > 0 && run_sec > 0) {
+                const runHours = run_sec / 3600;
+                const productionRate = productionMeters / runHours;
+                const remainingMeters = targetMeters - productionMeters;
+
+                if (remainingMeters > 0 && productionRate > 0) {
+                    estimatedTimeHours = remainingMeters / productionRate;
+                }
+            }
+
+            return {
+                efficiency: Math.min(efficiency, 100).toFixed(1),
+                productionInches: productionInches.toFixed(2),
+                productionMeters: productionMeters.toFixed(2),
+                totalStops: totalStops,
+                remainingShiftHours: remainingShiftHours.toFixed(2),
+                estimatedTimeHours: estimatedTimeHours,
+                shift_time_hm: secondsToHm(shift_sec),
+                run_time_hm: secondsToHm(run_sec),
+                targetMeters: targetMeters
+            };
+        }
+
+        // --- Status and Rendering ---
+
+        function getEfficiencyColorClass(efficiency, prefix) {
+            const eff = parseFloat(efficiency);
+            if (eff > 80) return `${prefix}-green`;
+            if (eff > 50) return `${prefix}-yellow`;
+            if (eff > 30) return `${prefix}-orange`;
+            return `${prefix}-red`;
+        }
+
+        // Modal stop indicator (no emojis)
+        function getCurrentStopIndicator(state, stopType) {
+            if (state === 1) {
+                return '<span class="indicator indicator-running">Status: RUNNING</span>';
+            }
+            if (stopType === 'Warp') {
+                return '<span class="indicator indicator-warp">STOP: Warp Break</span>';
+            }
+            if (stopType === 'Filling') {
+                return '<span class="indicator indicator-fill">STOP: Filling Break</span>';
+            }
+            if (stopType === 'Other') {
+                return '<span class="indicator indicator-other">STOP: Other Issue</span>';
+            }
+            return '<span class="indicator indicator-stopped">Status: STOPPED</span>';
+        }
+
+        // Creates the static card structure once
+        function createCardSkeletons() {
+            const grid = document.getElementById('dashboardGrid');
+            grid.innerHTML = '';
+
+            for (const loom of loomData) {
+                const machineId = loom.id;
+
+                const card = document.createElement('div');
+                card.className = 'machine-card status-loading'; // Default loading state
+                card.id = `machine-card-${machineId}`;
+                card.setAttribute('onclick', `openDetailsModal(${machineId})`);
+
+                card.innerHTML = `
+                    <div class="card-tile-header">
+                        <div class="header-title-group">
+                            <h2 id="machine-${machineId}-id">Machine ID: ${machineId}</h2>
+                        </div>
+                        <button class="settings-button" onclick="openSettingsModal(event, ${machineId})">⚙️</button>
+                    </div>
+                    <div class="card-tile-body">
+                        <div class="card-tile-stats">
+                            <div class="tile-state-line">
+                                <span class="status-dot" id="machine-${machineId}-dot"></span>
+                                <strong id="machine-${machineId}-state">Loading...</strong>
+                            </div>
+                            <div class="stat-line">
+                                <strong><span id="machine-${machineId}-prod">--</span></strong> m
+                            </div>
+                            <div class="stat-line">
+                                <strong><span id="machine-${machineId}-warp">--</span></strong> Warp Stops
+                            </div>
+                            <div class="stat-line">
+                                <strong><span id="machine-${machineId}-fill">--</span></strong> Filling Stops
+                            </div>
+                        </div>
+                        <div class="card-tile-efficiency" id="machine-${machineId}-eff">
+                            --%
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            }
+        }
+
+        // Main update function (updates summary tiles)
+        async function updateDashboard() {
+            const settings = loadSettings();
+            const fetchPromises = loomData.map(loom => fetchLoomData(loom.channelId, loom.apiKey));
+            const results = await Promise.all(fetchPromises);
+
+            const currentReadData = {};
+
+            results.forEach((data, index) => {
+                const loomConfigId = loomData[index].id;
+
+                if (!data || data.machine_id === undefined) {
+                    document.getElementById(`machine-${loomConfigId}-id`).textContent = `Machine ${loomConfigId} (Offline)`;
+                    document.getElementById(`machine-card-${loomConfigId}`).className = 'machine-card status-loading';
+                    return;
+                }
+
+                const machineId = data.machine_id;
+                const machineSettings = getMachineSettings(machineId);
+                const metrics = calculateMetrics(data, machineSettings.designPicks, machineSettings.targetMeters);
+
+                // Stop Logic
+                const lastData = lastReadData[machineId];
+                let stopType = 'None';
+                if (data.state === 0) {
+                    if (lastData && lastData.state === 1) { // Just stopped
+                        if (data.warp_stop > lastData.warp_stop) stopType = 'Warp';
+                        else if (data.filling_stop > lastData.filling_stop) stopType = 'Filling';
+                        else if (data.other_stop > lastData.other_stop) stopType = 'Other';
+                        else stopType = 'Persistent Stop';
+                    } else if (lastData && lastData.state === 0) {
+                        stopType = lastData.current_stop_type; // Carry over
+                    } else {
+                        stopType = 'Persistent Stop';
+                    }
+                }
+                data.current_stop_type = stopType;
+                data.shift_name = data.shift_sec >= 12 * 3600 ? 'B' : 'A'; // Add shift name
+                currentReadData[machineId] = data; // Store full data for modal
+
+                // Update Global Shift Info (using first machine)
+                if (index === 0) {
+                    document.getElementById('globalShiftInfo').textContent = `Shift: ${data.shift_name} (Total Time: ${metrics.shift_time_hm})`;
+                }
+
+                // --- Update Summary Tile ---
+                const card = document.getElementById(`machine-card-${machineId}`);
+                card.className = `machine-card ${getEfficiencyColorClass(metrics.efficiency, 'status')}`;
+
+                // Header
+                document.getElementById(`machine-${machineId}-id`).textContent = `Machine ID: ${machineId}`;
+
+                // Body Stats
+                const stateElement = document.getElementById(`machine-${machineId}-state`);
+                const dotElement = document.getElementById(`machine-${machineId}-dot`);
+
+                if (data.state === 1) {
+                    stateElement.textContent = "Running";
+                    stateElement.style.color = "var(--eff-text-green)";
+                    dotElement.className = "status-dot live-dot";
+                } else {
+                    if (data.current_stop_type === 'Warp') stateElement.textContent = "STOP (Warp)";
+                    else if (data.current_stop_type === 'Filling') stateElement.textContent = "STOP (Filling)";
+                    else if (data.current_stop_type === 'Other') stateElement.textContent = "STOP (Other)";
+                    else stateElement.textContent = "Stopped";
+
+                    stateElement.style.color = "var(--eff-text-red)";
+                    dotElement.className = "status-dot stopped-dot";
+                }
+
+                document.getElementById(`machine-${machineId}-prod`).textContent = metrics.productionMeters;
+                document.getElementById(`machine-${machineId}-warp`).textContent = data.warp_stop;
+                document.getElementById(`machine-${machineId}-fill`).textContent = data.filling_stop;
+
+                // Efficiency
+                const effElement = document.getElementById(`machine-${machineId}-eff`);
+                effElement.textContent = `${metrics.efficiency}%`;
+                effElement.className = `card-tile-efficiency ${getEfficiencyColorClass(metrics.efficiency, 'eff-text')}`;
+            });
+
+            lastReadData = currentReadData; // Update global state
+
+            const now = new Date();
+            document.getElementById('lastUpdatedTime').textContent = `Last Updated: ${now.toLocaleTimeString()}`;
+        }
+
+        // REMOVED toggleUnit()
+
+        // --- Initial Load and Interval ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            createCardSkeletons();
+            updateDashboard();
+
+            setInterval(updateDashboard, 15000);
+        });
+    </script>
+</body>
+
+</html>
