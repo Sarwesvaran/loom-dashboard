@@ -968,7 +968,6 @@
         }
 
         body {
-            /* REVERTED FONT */
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
@@ -1020,7 +1019,6 @@
         .dashboard-grid {
             padding: 32px 24px;
             display: grid;
-            /* DECREASED WIDTH */
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 24px;
         }
@@ -1041,7 +1039,6 @@
             transform: translateY(-3px);
         }
 
-        /* Efficiency Color Border */
         .status-green {
             border-left: 5px solid var(--green);
         }
@@ -1070,17 +1067,48 @@
             opacity: 0.3;
         }
 
+        .status-offline {
+            border-left: 5px solid var(--text-secondary);
+            background: #fafafa;
+            cursor: not-allowed;
+        }
+
+        .status-offline .card-tile-body,
+        .status-offline .card-tile-header {
+            opacity: 0.6;
+        }
+
+        .status-offline:hover {
+            transform: none;
+        }
+
+
         .card-tile-header {
             padding: 16px 20px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
+            /* Changed to align-items: flex-start */
             border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-title-group {
+            display: flex;
+            flex-direction: column;
+            /* Stack title and time */
         }
 
         .header-title-group h2 {
             margin: 0;
             font-size: 1.25em;
+        }
+
+        /* NEW: Style for the last-seen timestamp */
+        .header-title-group span.last-updated-span {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-top: 4px;
         }
 
         .settings-button {
@@ -1095,6 +1123,8 @@
             height: 36px;
             line-height: 34px;
             text-align: center;
+            flex-shrink: 0;
+            /* Prevent button from shrinking */
         }
 
         .settings-button:hover {
@@ -1158,7 +1188,6 @@
         }
 
         .card-tile-efficiency {
-            /* REVERTED FONT SIZE */
             font-size: 2.8em;
             font-weight: 700;
             padding-left: 20px;
@@ -1378,9 +1407,7 @@
 
     <header>
         <h1>Loom Monitoring Dashboard</h1>
-
         <div id="globalShiftInfo">Loading Shift...</div>
-
         <div class="controls">
             <div id="lastUpdatedTime">Updating...</div>
         </div>
@@ -1527,7 +1554,9 @@
 
         function openDetailsModal(machineId) {
             const data = lastReadData[machineId];
-            if (!data) { return; }
+            if (!data || data.isOffline) {
+                return;
+            }
 
             const settings = getMachineSettings(machineId);
             const metrics = calculateMetrics(data, settings.designPicks, settings.targetMeters);
@@ -1541,7 +1570,6 @@
             document.getElementById('details-stop-indicator').innerHTML = getCurrentStopIndicator(data.state, data.current_stop_type);
 
             document.getElementById('details-picks').textContent = data.picks;
-            // ALWAYS METERS
             document.getElementById('details-prod-label').textContent = `Production (m)`;
             document.getElementById('details-production').textContent = metrics.productionMeters;
             document.getElementById('details-shift-time').textContent = metrics.shift_time_hm;
@@ -1555,8 +1583,6 @@
 
             document.getElementById('detailsModal').style.display = 'block';
         }
-
-        // REMOVED HISTORY FUNCTIONS
 
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
@@ -1618,6 +1644,7 @@
                 if (!latestFeed) { return null; }
 
                 return {
+                    created_at: latestFeed.created_at,
                     picks: parseInt(latestFeed.field1),
                     warp_stop: parseInt(latestFeed.field2),
                     filling_stop: parseInt(latestFeed.field3),
@@ -1680,7 +1707,6 @@
             return `${prefix}-red`;
         }
 
-        // Modal stop indicator (no emojis)
         function getCurrentStopIndicator(state, stopType) {
             if (state === 1) {
                 return '<span class="indicator indicator-running">Status: RUNNING</span>';
@@ -1714,6 +1740,7 @@
                     <div class="card-tile-header">
                         <div class="header-title-group">
                             <h2 id="machine-${machineId}-id">Machine ID: ${machineId}</h2>
+                            <span class="last-updated-span" id="machine-${machineId}-time">--:--:--</span>
                         </div>
                         <button class="settings-button" onclick="openSettingsModal(event, ${machineId})">⚙️</button>
                     </div>
@@ -1752,14 +1779,53 @@
 
             results.forEach((data, index) => {
                 const loomConfigId = loomData[index].id;
+                const card = document.getElementById(`machine-card-${loomConfigId}`);
+                const stateElement = document.getElementById(`machine-${loomConfigId}-state`);
+                const dotElement = document.getElementById(`machine-${loomConfigId}-dot`);
+                const effElement = document.getElementById(`machine-${loomConfigId}-eff`);
+                const timeElement = document.getElementById(`machine-${loomConfigId}-time`); // Get time element
 
+                // --- OFFLINE CHECK 1: NO DATA RETURNED ---
                 if (!data || data.machine_id === undefined) {
                     document.getElementById(`machine-${loomConfigId}-id`).textContent = `Machine ${loomConfigId} (Offline)`;
-                    document.getElementById(`machine-card-${loomConfigId}`).className = 'machine-card status-loading';
+                    card.className = 'machine-card status-offline';
+                    stateElement.textContent = "Offline";
+                    stateElement.style.color = "var(--text-secondary)";
+                    dotElement.className = "status-dot";
+                    effElement.textContent = "--%";
+                    effElement.className = 'card-tile-efficiency';
+                    timeElement.textContent = "No data received"; // Update time element
                     return;
                 }
 
                 const machineId = data.machine_id;
+
+                // --- ALWAYS UPDATE TIME if data exists ---
+                const feedTime = new Date(data.created_at);
+                timeElement.textContent = `Last seen: ${feedTime.toLocaleTimeString()}`;
+
+                // --- OFFLINE CHECK 2: STALE DATA (TIMESTAMP > 2 MIN) ---
+                const now = new Date();
+                const diffMinutes = (now.getTime() - feedTime.getTime()) / 1000 / 60;
+
+                if (diffMinutes > 2) {
+                    document.getElementById(`machine-${machineId}-id`).textContent = `Machine ${machineId} (Offline)`;
+                    card.className = 'machine-card status-offline';
+
+                    stateElement.textContent = "Offline (Stale Data)";
+                    stateElement.style.color = "var(--text-secondary)";
+                    dotElement.className = "status-dot";
+
+                    effElement.textContent = "--%";
+                    effElement.className = 'card-tile-efficiency';
+
+                    data.isOffline = true;
+                    currentReadData[machineId] = data;
+                    return; // Skip rest of update
+                }
+
+                // --- IF ONLINE: PROCEED AS NORMAL ---
+                data.isOffline = false;
                 const machineSettings = getMachineSettings(machineId);
                 const metrics = calculateMetrics(data, machineSettings.designPicks, machineSettings.targetMeters);
 
@@ -1779,8 +1845,8 @@
                     }
                 }
                 data.current_stop_type = stopType;
-                data.shift_name = data.shift_sec >= 12 * 3600 ? 'B' : 'A'; // Add shift name
-                currentReadData[machineId] = data; // Store full data for modal
+                data.shift_name = data.shift_sec >= 12 * 3600 ? 'B' : 'A';
+                currentReadData[machineId] = data;
 
                 // Update Global Shift Info (using first machine)
                 if (index === 0) {
@@ -1788,16 +1854,11 @@
                 }
 
                 // --- Update Summary Tile ---
-                const card = document.getElementById(`machine-card-${machineId}`);
                 card.className = `machine-card ${getEfficiencyColorClass(metrics.efficiency, 'status')}`;
 
-                // Header
                 document.getElementById(`machine-${machineId}-id`).textContent = `Machine ID: ${machineId}`;
 
                 // Body Stats
-                const stateElement = document.getElementById(`machine-${machineId}-state`);
-                const dotElement = document.getElementById(`machine-${machineId}-dot`);
-
                 if (data.state === 1) {
                     stateElement.textContent = "Running";
                     stateElement.style.color = "var(--eff-text-green)";
@@ -1817,7 +1878,6 @@
                 document.getElementById(`machine-${machineId}-fill`).textContent = data.filling_stop;
 
                 // Efficiency
-                const effElement = document.getElementById(`machine-${machineId}-eff`);
                 effElement.textContent = `${metrics.efficiency}%`;
                 effElement.className = `card-tile-efficiency ${getEfficiencyColorClass(metrics.efficiency, 'eff-text')}`;
             });
@@ -1827,8 +1887,6 @@
             const now = new Date();
             document.getElementById('lastUpdatedTime').textContent = `Last Updated: ${now.toLocaleTimeString()}`;
         }
-
-        // REMOVED toggleUnit()
 
         // --- Initial Load and Interval ---
         document.addEventListener('DOMContentLoaded', () => {
