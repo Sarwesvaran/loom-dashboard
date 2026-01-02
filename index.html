@@ -88,7 +88,7 @@
             content: "";
             position: fixed;
             inset: 0;
-            background-image: url("bg.png");
+            background-image: url("images/bg.png");
 
             background-size: cover;
             background-position: center;
@@ -645,25 +645,13 @@
 
     <script>
         let loomData = [];
+
+        // --- NEW: Object to track stop start times ---
         let machineStopTimers = {};
 
-        // --- NEW: Proxy Configuration for GitHub Pages ---
-        // This proxy forwards your request from HTTPS (GitHub) to HTTP (Your IP)
-        const PROXY_URL = "https://corsproxy.io/?";
-
-        // Helper to wrap URLs with the proxy
-        function getProxiedUrl(targetUrl) {
-            // Encode the target URL to ensure special characters (like :) are handled
-            return PROXY_URL + encodeURIComponent(targetUrl);
-        }
-
-
         async function fetchMachineIds() {
-            // The original HTTP URL
-            const targetUrl = `http://69.62.76.244:8094/smartloom-rest-api/api/looms/MachineRunning-Info/machineId`;
-            
-            // Wrap it in the proxy so it works on HTTPS
-            const url = getProxiedUrl(targetUrl);
+            // const url = "http://localhost:8094/smartloom-rest-api/api/looms/MachineRunning-Info/machineId";
+            const url = `http://69.62.76.244:8094/smartloom-rest-api/api/looms/MachineRunning-Info/machineId`;
 
             const AUTH_HEADER = "Basic " + btoa("user01:test");
 
@@ -848,11 +836,7 @@
             let allResults = [];
 
             for (const { id: machineId } of loomData) {
-                // The original HTTP URL
-                const targetUrl = `http://69.62.76.244:8094/smartloom-rest-api/api/looms/MachineRunning-Info/list/${pageNum}/${pageSize}`;
-                
-                // Wrap it in the proxy
-                const url = getProxiedUrl(targetUrl);
+                const url = `http://69.62.76.244:8094/smartloom-rest-api/api/looms/MachineRunning-Info/list/${pageNum}/${pageSize}`;
 
                 try {
                     const response = await fetch(url, {
@@ -1095,7 +1079,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             loomData = await fetchMachineIds();
             if (loomData.length === 0) {
-                alert("No machines found from backend (Check console for Proxy errors)!");
+                alert("No machines found from backend!");
                 return;
             }
             loomData.sort((a, b) => {
