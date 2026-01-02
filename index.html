@@ -80,6 +80,23 @@
             padding: 0;
             background-color: var(--bg-color);
             color: var(--text-primary);
+            position: relative;
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image: url("bg.png");
+
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0.5;
+
+            z-index: -1;
+
         }
 
         /* --- Header --- */
@@ -126,7 +143,7 @@
         .dashboard-grid {
             padding: 32px 24px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
             gap: 24px;
         }
 
@@ -283,6 +300,20 @@
             flex-shrink: 0;
         }
 
+        /* --- NEW: Stop Timer Styles --- */
+        .stop-timer {
+            margin-left: 10px;
+            color: var(--red);
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: 700;
+            font-size: 1.1em;
+            background-color: var(--red-bg);
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: none;
+            /* Hidden by default */
+        }
+
         .live-dot {
             background-color: var(--green);
             animation: pulse-green 2s infinite;
@@ -386,6 +417,14 @@
             background: var(--bg-color);
             border-radius: 8px;
         }
+
+        .stat-item-full {
+            grid-column: 1 / -1;
+            padding: 12px;
+            background: var(--bg-color);
+            border-radius: 8px;
+        }
+
 
         .stat-label {
             font-size: 0.8em;
@@ -581,6 +620,12 @@
                         <div class="stat-label">Warp / Filling Stops</div>
                         <div class="stat-value" id="details-stop-counts">-- / --</div>
                     </div>
+                    <div class="stat-item-full">
+                        <div class="stat-label">Design ID</div>
+                        <div class="stat-value" id="details-design-id">-</div>
+                    </div>
+
+
                 </div>
                 <div class="target-info">
                     <div class="stat-label">Remaining Shift Time</div>
@@ -597,22 +642,64 @@
         </div>
     </div>
 
-    <script>
-        const loomData = [
-            { id: 'M001' },
-            { id: 'M002' }
-        ];
 
+    <script>
+        let loomData = [];
+        let machineStopTimers = {};
+
+        // --- NEW: Proxy Configuration for GitHub Pages ---
+        // This proxy forwards your request from HTTPS (GitHub) to HTTP (Your IP)
+        const PROXY_URL = "https://corsproxy.io/?";
+
+        // Helper to wrap URLs with the proxy
+        function getProxiedUrl(targetUrl) {
+            // Encode the target URL to ensure special characters (like :) are handled
+            return PROXY_URL + encodeURIComponent(targetUrl);
+        }
+
+
+        async function fetchMachineIds() {
+            // The original HTTP URL
+            const targetUrl = `http://69.62.76.244:8094/smartloom-rest-api/api/looms/MachineRunning-Info/machineId`;
+            
+            // Wrap it in the proxy so it works on HTTPS
+            const url = getProxiedUrl(targetUrl);
+
+            const AUTH_HEADER = "Basic " + btoa("user01:test");
+
+            try {
+                const response = await fetch(url, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": AUTH_HEADER,
+                        "Accept": "application/json"
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const rawList = await response.json();
+                console.log("RAW MACHINE IDS:", rawList);
+
+                return rawList
+                    .filter(id => typeof id === "string" && id.startsWith("LOOM "))
+                    .map(id => ({ id }));
+
+            } catch (error) {
+                console.error("MachineId API error:", error);
+                return [];
+            }
+        }
 
         // Global state
         let activeMachineId = null;
         const SETTINGS_KEY = 'loomSettings';
         const PICKS_PER_METER = 39.3701;
-
         let lastReadData = {};
 
-        // --- Settings Management ---
-
+        // --- Settings Management (Unchanged) ---
         function loadSettings() {
             const stored = localStorage.getItem(SETTINGS_KEY);
             let settings = {};
@@ -645,8 +732,7 @@
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
         }
 
-        // --- Modal Control ---
-
+        // --- Modal Control (Unchanged) ---
         function openSettingsModal(event, machineId) {
             event.stopPropagation();
             activeMachineId = machineId;
@@ -676,8 +762,8 @@
             document.getElementById('details-stop-indicator').innerHTML =
                 getCurrentStopIndicator(data.state, data.cause);
 
-
             document.getElementById('details-picks').textContent = data.picks;
+            document.getElementById('details-design-id').textContent = data.designId;
             document.getElementById('details-prod-label').textContent = `Production (m)`;
             document.getElementById('details-production').textContent = metrics.productionMeters;
             document.getElementById('details-shift-time').textContent = metrics.shift_time_hm;
@@ -685,7 +771,9 @@
             document.getElementById('details-total-stops').textContent = metrics.totalStops;
             document.getElementById('details-stop-counts').textContent = `${data.warp_stop} / ${data.filling_stop}`;
 
-            document.getElementById('details-shift-remain').textContent = `${metrics.remainingShiftHours} hrs`;
+            document.getElementById('details-shift-remain').textContent =
+                metrics.remainingShiftTime;
+
             document.getElementById('details-target-label').textContent = `Time to Target (${metrics.targetMeters}m)`;
             document.getElementById('details-target-time').textContent = formatTime(metrics.estimatedTimeHours);
 
@@ -712,15 +800,13 @@
             updateDashboard();
         }
 
-
         window.onclick = function (event) {
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
             }
         }
 
-        // --- Helper Functions (Time conversion) ---
-
+        // --- Helper Functions ---
         function secondsToHm(totalSeconds) {
             if (isNaN(totalSeconds) || totalSeconds < 0) return '00h 00m';
             const hours = Math.floor(totalSeconds / 3600);
@@ -744,40 +830,59 @@
             return parts.join(' ');
         }
 
+        // --- NEW: Helper to format stopwatch time ---
+        function formatStopDuration(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            const pad = n => n.toString().padStart(2, '0');
+            return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        }
+
         async function fetchLoomDataFromBackend() {
-            const url = "http://69.62.76.244:8094/smartloom-rest-api/api/looms/MachineRunning-Info/list/0/10";
-
             const AUTH_HEADER = "Basic " + btoa("user01:test");
+            const pageNum = 0;
+            const pageSize = 10;
+            let allResults = [];
 
-            try {
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": AUTH_HEADER
-                    },
-                    body: JSON.stringify({})
-                });
+            for (const { id: machineId } of loomData) {
+                // The original HTTP URL
+                const targetUrl = `http://69.62.76.244:8094/smartloom-rest-api/api/looms/MachineRunning-Info/list/${pageNum}/${pageSize}`;
+                
+                // Wrap it in the proxy
+                const url = getProxiedUrl(targetUrl);
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                try {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": AUTH_HEADER
+                        },
+                        body: JSON.stringify({ machineId: machineId })
+                    });
+
+                    if (!response.ok) {
+                        console.warn(`Failed for ${machineId}: HTTP ${response.status}`);
+                        continue;
+                    }
+
+                    const result = await response.json();
+                    if (result?.resultList?.length) {
+                        allResults.push(...result.resultList);
+                    }
+                } catch (error) {
+                    console.error(`Backend error for ${machineId}`, error);
                 }
-
-                const result = await response.json();
-                console.log(" API DATA:", result);
-
-                return result.resultList || [];
-            } catch (error) {
-                console.error(" Backend API error:", error);
-                return [];
             }
+            return allResults;
         }
 
         // --- Metric Calculation ---
-
         function calculateMetrics(data, designPicks, targetMeters) {
             const { picks, shift_sec, run_sec, warp_stop, filling_stop, other_stop } = data;
-
             const efficiency = shift_sec > 0 ? (run_sec / shift_sec) * 100 : 0;
             const productionInches = picks / designPicks;
             const productionMeters = productionInches / PICKS_PER_METER;
@@ -786,7 +891,6 @@
             const now = new Date();
             const shiftStart = new Date(now);
             const shiftEnd = new Date(now);
-
             const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
             if (currentMinutes >= 510 && currentMinutes <= 1230) { // Shift A
@@ -804,12 +908,8 @@
                 }
             }
 
-            const remainingShiftSeconds = Math.max(
-                0,
-                (shiftEnd.getTime() - now.getTime()) / 1000
-            );
-
-            const remainingShiftHours = remainingShiftSeconds / 3600;
+            const remainingShiftSeconds = Math.max(0, (shiftEnd.getTime() - now.getTime()) / 1000);
+            const remainingShiftTime = secondsToHMS(remainingShiftSeconds);
 
             let estimatedTimeHours = Infinity;
             if (productionMeters > 0 && run_sec > 0) {
@@ -827,7 +927,7 @@
                 productionInches: productionInches.toFixed(2),
                 productionMeters: productionMeters.toFixed(2),
                 totalStops: totalStops,
-                remainingShiftHours: remainingShiftHours.toFixed(2),
+                remainingShiftTime: remainingShiftTime,
                 estimatedTimeHours: estimatedTimeHours,
                 shift_time_hm: secondsToHm(shift_sec),
                 run_time_hm: secondsToHm(run_sec),
@@ -835,8 +935,16 @@
             };
         }
 
-        // --- Status and Rendering ---
+        function secondsToHMS(totalSeconds) {
+            totalSeconds = Math.max(0, Math.floor(totalSeconds));
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            const pad = n => n.toString().padStart(2, '0');
+            return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        }
 
+        // --- Status and Rendering ---
         function getEfficiencyColorClass(efficiency, prefix) {
             const eff = parseFloat(efficiency);
             if (eff > 80) return `${prefix}-green`;
@@ -849,65 +957,49 @@
             if (state === 1) {
                 return '<span class="indicator indicator-running">Status: RUNNING</span>';
             }
-
             switch (cause) {
-                case 1:
-                    return '<span class="indicator indicator-warp">STOP: Warp Break</span>';
-                case 2:
-                    return '<span class="indicator indicator-fill">STOP: Filling Break</span>';
-                case 3:
-                    return '<span class="indicator indicator-warp">STOP: Selvedge Break</span>';
-                case 4:
-                    return '<span class="indicator indicator-other">STOP: Other Issue</span>';
-                default:
-                    return '<span class="indicator indicator-stopped">Status: STOPPED</span>';
+                case 1: return '<span class="indicator indicator-warp">STOP: Warp Break</span>';
+                case 2: return '<span class="indicator indicator-fill">STOP: Filling Break</span>';
+                case 3: return '<span class="indicator indicator-warp">STOP: Selvedge Break</span>';
+                case 4: return '<span class="indicator indicator-other">STOP: Other Issue</span>';
+                default: return '<span class="indicator indicator-stopped">Status: STOPPED</span>';
             }
         }
 
-
-        // Creates the static card structure once
         function createCardSkeletons() {
             const grid = document.getElementById('dashboardGrid');
             grid.innerHTML = '';
 
             for (const loom of loomData) {
                 const machineId = loom.id;
-
                 const card = document.createElement('div');
                 card.className = 'machine-card status-loading';
                 card.id = `machine-card-${machineId}`;
                 card.setAttribute('onclick', `openDetailsModal('${machineId}')`);
 
+                // --- NEW: Added span for Timer inside tile-state-line ---
                 card.innerHTML = `
-            <div class="card-tile-header">
-                <div class="header-title-group">
-                    <h2 id="machine-${machineId}-id">Machine ID: ${machineId}</h2>
-                    <span class="last-updated-span" id="machine-${machineId}-time">--:--:--</span>
-                </div>
-                <button class="settings-button"
-                        onclick="openSettingsModal(event, '${machineId}')">⚙️</button>
-            </div>
-            <div class="card-tile-body">
-                <div class="card-tile-stats">
-                    <div class="tile-state-line">
-                        <span class="status-dot" id="machine-${machineId}-dot"></span>
-                        <strong id="machine-${machineId}-state">Loading...</strong>
+                    <div class="card-tile-header">
+                        <div class="header-title-group">
+                            <h2 id="machine-${machineId}-id">${machineId}</h2>
+                            <span class="last-updated-span" id="machine-${machineId}-time">--:--:--</span>
+                        </div>
+                        <button class="settings-button" onclick="openSettingsModal(event, '${machineId}')">⚙️</button>
                     </div>
-                    <div class="stat-line">
-                        <strong><span id="machine-${machineId}-prod">--</span></strong> m
+                    <div class="card-tile-body">
+                        <div class="card-tile-stats">
+                            <div class="tile-state-line">
+                                <span class="status-dot" id="machine-${machineId}-dot"></span>
+                                <strong id="machine-${machineId}-state">Loading...</strong>
+                                <span id="machine-${machineId}-timer" class="stop-timer"></span> 
+                            </div>
+                            <div class="stat-line"><strong><span id="machine-${machineId}-prod">--</span></strong> m</div>
+                            <div class="stat-line"><strong><span id="machine-${machineId}-warp">--</span></strong> Warp Stops</div>
+                            <div class="stat-line"><strong><span id="machine-${machineId}-fill">--</span></strong> Filling Stops</div>
+                        </div>
+                        <div class="card-tile-efficiency" id="machine-${machineId}-eff">--%</div>
                     </div>
-                    <div class="stat-line">
-                        <strong><span id="machine-${machineId}-warp">--</span></strong> Warp Stops
-                    </div>
-                    <div class="stat-line">
-                        <strong><span id="machine-${machineId}-fill">--</span></strong> Filling Stops
-                    </div>
-                </div>
-                <div class="card-tile-efficiency" id="machine-${machineId}-eff">
-                    --%
-                </div>
-            </div>
-        `;
+                `;
                 grid.appendChild(card);
             }
         }
@@ -916,24 +1008,25 @@
             const hours = dateObj.getHours();
             const minutes = dateObj.getMinutes();
             const totalMinutes = hours * 60 + minutes;
-
-            const shiftAStart = 8 * 60 + 30;   // 08:30
-            const shiftAEnd = 20 * 60 + 30;  // 20:30
-
+            const shiftAStart = 8 * 60 + 30;
+            const shiftAEnd = 20 * 60 + 30;
             if (totalMinutes >= shiftAStart && totalMinutes <= shiftAEnd) {
                 return "Shift A";
             }
             return "Shift B";
         }
 
-
-
-        // Main update function (updates summary tiles)
         async function updateDashboard() {
             const rawList = await fetchLoomDataFromBackend();
             const currentShift = getCurrentShift();
-            const latestList = getLatestByMachine(rawList);
-            const currentReadData = {};
+
+            const latestList = getLatestByMachine(rawList).sort((a, b) => {
+                const numA = parseInt(a.machineId.replace(/\D/g, ''), 10);
+                const numB = parseInt(b.machineId.replace(/\D/g, ''), 10);
+                return numA - numB;
+            });
+
+            const currentReadData = { ...lastReadData };
 
             latestList.forEach(dto => {
                 const data = normalizeBackendData(dto);
@@ -943,80 +1036,83 @@
                 if (!card) return;
 
                 const settings = getMachineSettings(machineId);
-                const metrics = calculateMetrics(
-                    data,
-                    settings.designPicks,
-                    settings.targetMeters
-                );
+                const metrics = calculateMetrics(data, settings.designPicks, settings.targetMeters);
 
-                // Header
-                document.getElementById(`machine-${machineId}-id`)
-                    .textContent = `Machine ID: ${machineId}`;
+                // --- UPDATE CARD CONTENT ---
+                document.getElementById(`machine-${machineId}-id`).textContent = machineId;
+                document.getElementById(`machine-${machineId}-time`).textContent = `Last seen: ${new Date(data.created_at).toLocaleTimeString()}`;
 
-                document.getElementById(`machine-${machineId}-time`)
-                    .textContent = `Last seen: ${new Date(data.created_at).toLocaleTimeString()}`;
-
-                // Status
                 const stateEl = document.getElementById(`machine-${machineId}-state`);
                 const dotEl = document.getElementById(`machine-${machineId}-dot`);
+                const timerEl = document.getElementById(`machine-${machineId}-timer`);
 
+                // --- NEW: Timer Logic ---
                 if (data.state === 1) {
+                    // Running
                     stateEl.textContent = "Running";
                     dotEl.className = "status-dot live-dot";
+
+                    // Clear the timer
+                    if (machineStopTimers[machineId]) {
+                        delete machineStopTimers[machineId];
+                    }
+                    timerEl.style.display = 'none';
+                    timerEl.textContent = '';
+
                 } else {
+                    // Stopped
                     const reason = getStopReason(data.cause);
                     stateEl.textContent = `Stopped (${reason})`;
                     dotEl.className = "status-dot stopped-dot";
+
+                    // Handle Timer
+                    if (!machineStopTimers[machineId]) {
+                        // If we didn't have a timer yet, start one now
+                        machineStopTimers[machineId] = Date.now();
+                    }
+
+                    const diff = Date.now() - machineStopTimers[machineId];
+                    timerEl.textContent = formatStopDuration(diff);
+                    timerEl.style.display = 'inline-block';
                 }
 
+                document.getElementById(`machine-${machineId}-prod`).textContent = metrics.productionMeters;
+                document.getElementById(`machine-${machineId}-warp`).textContent = data.warp_stop;
+                document.getElementById(`machine-${machineId}-fill`).textContent = data.filling_stop;
 
-                // Stats
-                document.getElementById(`machine-${machineId}-prod`)
-                    .textContent = metrics.productionMeters;
-
-                document.getElementById(`machine-${machineId}-warp`)
-                    .textContent = data.warp_stop;
-
-                document.getElementById(`machine-${machineId}-fill`)
-                    .textContent = data.filling_stop;
-
-                document.getElementById("globalShiftInfo").textContent =
-                    `${currentShift}`;
-
-
-                // Efficiency
                 const effEl = document.getElementById(`machine-${machineId}-eff`);
                 effEl.textContent = `${metrics.efficiency}%`;
-                effEl.className =
-                    `card-tile-efficiency ${getEfficiencyColorClass(metrics.efficiency, 'eff-text')}`;
+                effEl.className = `card-tile-efficiency ${getEfficiencyColorClass(metrics.efficiency, 'eff-text')}`;
 
-                card.className =
-                    `machine-card ${getEfficiencyColorClass(metrics.efficiency, 'status')}`;
-
+                card.className = `machine-card ${getEfficiencyColorClass(metrics.efficiency, 'status')}`;
                 currentReadData[machineId] = data;
             });
 
             lastReadData = currentReadData;
-            document.getElementById('lastUpdatedTime')
-                .textContent = `Last Updated: ${new Date().toLocaleTimeString()}`;
+            document.getElementById("globalShiftInfo").textContent = currentShift;
         }
 
+        document.addEventListener('DOMContentLoaded', async () => {
+            loomData = await fetchMachineIds();
+            if (loomData.length === 0) {
+                alert("No machines found from backend (Check console for Proxy errors)!");
+                return;
+            }
+            loomData.sort((a, b) => {
+                const numA = parseInt(a.id.replace(/\D/g, ''), 10);
+                const numB = parseInt(b.id.replace(/\D/g, ''), 10);
+                return numA - numB;
+            });
 
-        // --- Initial Load and Interval ---
-        document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
             createCardSkeletons();
+            startLiveClock();
             updateDashboard();
-
-            setInterval(updateDashboard, 15000);
+            setInterval(updateDashboard, 1000);
         });
 
-
         function normalizeBackendData(dto) {
-            const createdDate = dto.createdOn
-                ? new Date(dto.createdOn)
-                : new Date();
-
+            const createdDate = dto.createdOn ? new Date(dto.createdOn) : new Date();
             return {
                 machineId: dto.machineId,
                 picks: dto.picks || 0,
@@ -1029,13 +1125,10 @@
                 state: dto.state || 0,
                 created_at: createdDate,
                 cause: dto.cause ?? 0,
-
+                designId: dto.designId || "--",
                 shift_name: getShiftByDate(createdDate)
             };
         }
-
-
-
 
         function localTimeToSeconds(timeStr) {
             if (!timeStr) return 0;
@@ -1056,15 +1149,11 @@
 
         function getCurrentShift() {
             const now = new Date();
-
             const hours = now.getHours();
             const minutes = now.getMinutes();
-
             const currentMinutes = hours * 60 + minutes;
-
             const shiftAStart = 8 * 60 + 30;
             const shiftAEnd = 20 * 60 + 30;
-
             if (currentMinutes >= shiftAStart && currentMinutes <= shiftAEnd) {
                 return "Shift A";
             } else {
@@ -1083,8 +1172,14 @@
             }
         }
 
-
-
+        function startLiveClock() {
+            setInterval(() => {
+                const el = document.getElementById('lastUpdatedTime');
+                if (el) {
+                    el.textContent = `Current Time: ${new Date().toLocaleTimeString()}`;
+                }
+            }, 1000);
+        }
 
     </script>
 </body>
